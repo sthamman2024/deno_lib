@@ -63,6 +63,7 @@ use std::fmt::Write as _;
 use std::io::Read;
 use std::io::Write;
 use std::num::NonZeroUsize;
+use std::ops::Index;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicUsize;
@@ -417,10 +418,13 @@ trait TestReporter {
 }
 
 fn get_test_reporter(options: &TestSpecifiersOptions) -> Box<dyn TestReporter> {
-  return Box::new(PrettyTestReporter::new(
-    options.concurrent_jobs.get() > 1,
-    options.log_level != Some(Level::Error),
-  ));
+  return Box::new(CompoundTestReporter::new(vec![
+    Box::new(PrettyTestReporter::new(
+      options.concurrent_jobs.get() > 1,
+      options.log_level != Some(Level::Error),
+    )),
+    Box::new(JsonTestReporter::new()),
+  ]));
 }
 
 struct CompoundTestReporter {
@@ -1042,6 +1046,145 @@ impl TestReporter for PrettyTestReporter {
     }
     println!();
     self.in_new_line = true;
+  }
+}
+
+struct JsonTestReporter {
+  // Stores TestCases (i.e. Tests) by the Test ID
+  cases: IndexMap<usize, quick_junit::TestCase>,
+}
+
+impl JsonTestReporter {
+  fn new() -> Self {
+    Self {
+      cases: IndexMap::new(),
+    }
+  }
+
+  fn convert_status(status: &TestResult) -> quick_junit::TestCaseStatus {
+    match status {
+      TestResult::Ok => quick_junit::TestCaseStatus::success(),
+      TestResult::Ignored => quick_junit::TestCaseStatus::skipped(),
+      TestResult::Failed(failure) => quick_junit::TestCaseStatus::NonSuccess {
+        kind: quick_junit::NonSuccessKind::Failure,
+        message: Some(failure.to_string()),
+        ty: None,
+        description: None,
+        reruns: vec![],
+      },
+      TestResult::Cancelled => quick_junit::TestCaseStatus::NonSuccess {
+        kind: quick_junit::NonSuccessKind::Error,
+        message: Some("Cancelled".to_string()),
+        ty: None,
+        description: None,
+        reruns: vec![],
+      },
+    }
+  }
+}
+
+impl TestReporter for JsonTestReporter {
+  fn report_register(&mut self, description: &TestDescription) {
+    self.cases.insert(
+      description.id,
+      quick_junit::TestCase::new(
+        description.name.clone(),
+        quick_junit::TestCaseStatus::skipped(),
+      ),
+    );
+  }
+
+  fn report_plan(&mut self, _plan: &TestPlan) {}
+
+  fn report_wait(&mut self, _description: &TestDescription) {}
+
+  fn report_output(&mut self, _output: &[u8]) {
+    /*
+     TODO: it would be nice to include stdout/stderr, but we currently have a
+     global stream for both that doesn't keep track of what test produced what.
+    */
+  }
+
+  fn report_result(
+    &mut self,
+    description: &TestDescription,
+    result: &TestResult,
+    elapsed: u64,
+  ) {
+    if let Some(mut case) = self.cases.get_mut(&description.id) {
+      case.status = Self::convert_status(result);
+      case.set_time(Duration::from_millis(elapsed));
+    }
+  }
+
+  fn report_uncaught_error(&mut self, _origin: &str, _error: &JsError) {}
+
+  fn report_step_register(&mut self, _description: &TestStepDescription) {}
+
+  fn report_step_wait(&mut self, _description: &TestStepDescription) {}
+
+  fn report_step_result(
+    &mut self,
+    description: &TestStepDescription,
+    result: &TestStepResult,
+    _elapsed: u64,
+    _tests: &IndexMap<usize, TestDescription>,
+    _test_steps: &IndexMap<usize, TestStepDescription>,
+  ) {
+    let status = match result {
+      TestStepResult::Ok => "passed",
+      TestStepResult::Ignored => "skipped",
+      TestStepResult::Failed(_) => "failure",
+    };
+    if let Some(case) = self.cases.get_mut(&description.id) {
+      case.add_property(quick_junit::Property::new(
+        format!("step[{}]", status),
+        description.name.clone(),
+      ));
+    }
+  }
+
+  fn report_summary(
+    &mut self,
+    _summary: &TestSummary,
+    elapsed: &Duration,
+    tests: &IndexMap<usize, TestDescription>,
+    _test_steps: &IndexMap<usize, TestStepDescription>,
+  ) {
+    let mut suites: IndexMap<String, quick_junit::TestSuite> = IndexMap::new();
+    for (id, case) in &self.cases {
+      let test = tests.get(id).unwrap();
+      suites
+        .entry(test.location.file_name.clone())
+        .and_modify(|s| {
+          s.add_test_case(case.clone());
+        })
+        .or_insert_with(|| {
+          quick_junit::TestSuite::new(test.location.file_name.clone())
+            .add_test_case(case.clone())
+            .to_owned()
+        });
+    }
+
+    let mut report = quick_junit::Report::new("Deno Test");
+    report.set_time(elapsed.clone()).add_test_suites(
+      suites
+        .values()
+        .cloned()
+        .collect::<Vec<quick_junit::TestSuite>>(),
+    );
+    let mut file = std::fs::File::create("test.xml").unwrap();
+    let _ = file.write_all(report.to_string().unwrap().as_bytes());
+  }
+
+  fn report_sigint(
+    &mut self,
+    tests_pending: &HashSet<usize>,
+    tests: &IndexMap<usize, TestDescription>,
+    test_steps: &IndexMap<usize, TestStepDescription>,
+  ) {
+    // I currently have no clue how to handle this...
+    todo!()
   }
 }
 
