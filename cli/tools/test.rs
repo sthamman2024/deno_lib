@@ -380,7 +380,7 @@ impl TestSummary {
 }
 
 trait TestReporter {
-  fn report_register(&mut self, _description: &TestDescription);
+  fn report_register(&mut self, description: &TestDescription);
   fn report_plan(&mut self, plan: &TestPlan);
   fn report_wait(&mut self, description: &TestDescription);
   fn report_output(&mut self, output: &[u8]);
@@ -390,8 +390,8 @@ trait TestReporter {
     result: &TestResult,
     elapsed: u64,
   );
-  fn report_uncaught_error(&mut self, origin: &str, _error: &JsError);
-  fn report_step_register(&mut self, _description: &TestStepDescription);
+  fn report_uncaught_error(&mut self, origin: &str, error: &JsError);
+  fn report_step_register(&mut self, description: &TestStepDescription);
   fn report_step_wait(&mut self, description: &TestStepDescription);
   fn report_step_result(
     &mut self,
@@ -421,6 +421,107 @@ fn get_test_reporter(options: &TestSpecifiersOptions) -> Box<dyn TestReporter> {
     options.concurrent_jobs.get() > 1,
     options.log_level != Some(Level::Error),
   ));
+}
+
+struct CompoundTestReporter {
+  test_reporters: Vec<Box<dyn TestReporter>>,
+}
+
+impl CompoundTestReporter {
+  fn new(test_reporters: Vec<Box<dyn TestReporter>>) -> Self {
+    Self { test_reporters }
+  }
+}
+
+impl TestReporter for CompoundTestReporter {
+  fn report_register(&mut self, description: &TestDescription) {
+    for reporter in &mut self.test_reporters {
+      reporter.report_register(description);
+    }
+  }
+
+  fn report_plan(&mut self, plan: &TestPlan) {
+    for reporter in &mut self.test_reporters {
+      reporter.report_plan(plan);
+    }
+  }
+
+  fn report_wait(&mut self, description: &TestDescription) {
+    for reporter in &mut self.test_reporters {
+      reporter.report_wait(description);
+    }
+  }
+
+  fn report_output(&mut self, output: &[u8]) {
+    for reporter in &mut self.test_reporters {
+      reporter.report_output(output);
+    }
+  }
+
+  fn report_result(
+    &mut self,
+    description: &TestDescription,
+    result: &TestResult,
+    elapsed: u64,
+  ) {
+    for reporter in &mut self.test_reporters {
+      reporter.report_result(description, result, elapsed);
+    }
+  }
+
+  fn report_uncaught_error(&mut self, origin: &str, error: &JsError) {
+    for reporter in &mut self.test_reporters {
+      reporter.report_uncaught_error(origin, error);
+    }
+  }
+
+  fn report_step_register(&mut self, description: &TestStepDescription) {
+    for reporter in &mut self.test_reporters {
+      reporter.report_step_register(description)
+    }
+  }
+
+  fn report_step_wait(&mut self, description: &TestStepDescription) {
+    for reporter in &mut self.test_reporters {
+      reporter.report_step_wait(description)
+    }
+  }
+
+  fn report_step_result(
+    &mut self,
+    desc: &TestStepDescription,
+    result: &TestStepResult,
+    elapsed: u64,
+    tests: &IndexMap<usize, TestDescription>,
+    test_steps: &IndexMap<usize, TestStepDescription>,
+  ) {
+    for reporter in &mut self.test_reporters {
+      reporter.report_step_result(desc, result, elapsed, tests, test_steps);
+    }
+  }
+
+  fn report_summary(
+    &mut self,
+    summary: &TestSummary,
+    elapsed: &Duration,
+    tests: &IndexMap<usize, TestDescription>,
+    test_steps: &IndexMap<usize, TestStepDescription>,
+  ) {
+    for reporter in &mut self.test_reporters {
+      reporter.report_summary(summary, elapsed, tests, test_steps);
+    }
+  }
+
+  fn report_sigint(
+    &mut self,
+    tests_pending: &HashSet<usize>,
+    tests: &IndexMap<usize, TestDescription>,
+    test_steps: &IndexMap<usize, TestStepDescription>,
+  ) {
+    for reporter in &mut self.test_reporters {
+      reporter.report_sigint(tests_pending, tests, test_steps);
+    }
+  }
 }
 
 struct PrettyTestReporter {
