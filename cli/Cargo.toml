@@ -1,20 +1,22 @@
 # Copyright 2018-2023 the Deno authors. All rights reserved. MIT license.
 
 [package]
-name = "deno"
+name = "deno_lib"
 version = "1.36.1"
 authors.workspace = true
-default-run = "deno"
 edition.workspace = true
 exclude = ["tests/testdata/npm/registry/*"]
 license.workspace = true
 repository.workspace = true
-description = "Provides the deno executable"
+description = "Provides the deno lib"
 
-[[bin]]
-name = "deno"
-path = "main.rs"
-doc = false
+[lib]
+name = "deno_lib"
+path = "lib.rs"
+test = false
+doctest = false
+harness = false
+crate-type = ["lib"]
 
 [[bench]]
 name = "deno_bench"
