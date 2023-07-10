@@ -412,37 +412,6 @@ fn main() {
     "Missing symbols list! Generate using tools/napi/generate_symbols_lists.js",
   );
 
-  #[cfg(target_os = "windows")]
-  println!(
-    "cargo:rustc-link-arg-bin=deno=/DEF:{}",
-    symbols_path.display()
-  );
-
-  #[cfg(target_os = "macos")]
-  println!(
-    "cargo:rustc-link-arg-bin=deno=-Wl,-exported_symbols_list,{}",
-    symbols_path.display()
-  );
-
-  #[cfg(target_os = "linux")]
-  {
-    // If a custom compiler is set, the glibc version is not reliable.
-    // Here, we assume that if a custom compiler is used, that it will be modern enough to support a dynamic symbol list.
-    if env::var("CC").is_err()
-      && glibc_version::get_version()
-        .map(|ver| ver.major <= 2 && ver.minor < 35)
-        .unwrap_or(false)
-    {
-      println!("cargo:warning=Compiling with all symbols exported, this will result in a larger binary. Please use glibc 2.35 or later for an optimised build.");
-      println!("cargo:rustc-link-arg-bin=deno=-rdynamic");
-    } else {
-      println!(
-        "cargo:rustc-link-arg-bin=deno=-Wl,--export-dynamic-symbol-list={}",
-        symbols_path.display()
-      );
-    }
-  }
-
   // To debug snapshot issues uncomment:
   // op_fetch_asset::trace_serializer();
 
