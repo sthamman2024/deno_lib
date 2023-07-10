@@ -1,117 +1,115 @@
 # Deno
 
-[![](https://img.shields.io/crates/v/deno.svg)](https://crates.io/crates/deno)
-[![Twitter badge][]][Twitter link] [![Discord badge][]][Discord link]
-[![YouTube badge][]][Youtube link]
+A fork of Deno to allow the cli (specifically the module loader) to be embedded in rust.
 
-<img align="right" src="https://deno.land/logo.svg" height="150px" alt="the deno mascot dinosaur standing in the rain">
+### Sample usage
 
-[Deno](https://deno.com/runtime) is a _simple_, _modern_ and _secure_ runtime
-for **JavaScript** and **TypeScript** that uses V8 and is built in Rust.
+```rust
+use deno_core::op;
+use deno_core::resolve_path;
+use deno_lib::deno_runtime::deno_core::serde_v8;
+use deno_lib::deno_runtime::permissions::Permissions;
+use deno_lib::deno_runtime::permissions::PermissionsContainer;
+use deno_lib::deno_runtime::worker::MainWorker;
+use deno_lib::deno_runtime::worker::WorkerOptions;
+use deno_lib::js::deno_isolate_init;
+use deno_lib::CliFactory;
+use deno_lib::Flags;
+use serde::{Deserialize, Serialize};
+use std::env::current_dir;
 
-### Features
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DenoLibData {
+    pub id: i32,
+    pub name: String,
+    pub data: Vec<u8>,
+}
 
-- [Secure by default.](https://deno.land/manual/basics/permissions) No file,
-  network, or environment access, unless explicitly enabled.
-- Provides
-  [web platform functionality and APIs](https://deno.land/manual/runtime/web_platform_apis),
-  e.g. using ES modules, web workers, and `fetch()`.
-- Supports
-  [TypeScript out of the box](https://deno.land/manual/advanced/typescript).
-- Ships only a single executable file.
-- [Built-in tooling](https://deno.land/manual/tools#built-in-tooling) including
-  `deno test`, `deno fmt`, `deno bench`, and more.
-- Includes [a set of reviewed standard modules](https://deno.land/std/)
-  guaranteed to work with Deno.
-- [Supports npm.](https://deno.land/manual/node)
+deno_core::extension!(
+  deno_lib,
+  ops = [op_hello],
+  esm_entry_point = "ext:deno_lib/bootstrap.js",
+  esm = [dir "src", "bootstrap.js"],
+);
 
-### Install
+#[op]
+fn op_hello(mut input: DenoLibData) -> DenoLibData {
+    println!("Hello {:?}!", input);
+    input.id += 1;
+    input.name = format!("Hello {}", input.name);
+    input
+}
 
-Shell (Mac, Linux):
+async fn make_main_worker() -> anyhow::Result<MainWorker> {
+    let mut flags = Flags::default();
+    flags.cached_only = false;
+    flags.allow_net = Some(vec![]);
+    flags.cache_path = Some(".deno_lib".to_string().into());
+    flags.allow_read = Some(vec!["./local".to_string().into()]);
+    flags.no_prompt = true;
+    flags.allow_env = None;
+    flags.log_level = Some(log::Level::Error);
 
-```sh
-curl -fsSL https://deno.land/install.sh | sh
+    let factory = CliFactory::from_flags(flags.clone()).await?;
+    let worker_factory = factory.create_cli_main_worker_factory().await?;
+    let cli_options = factory.cli_options();
+    let permissions = PermissionsContainer::new(Permissions::from_options(
+        &cli_options.permissions_options(),
+    )?);
+    let module_loader = worker_factory.create_module_loader(permissions.clone());
+    let cwd = current_dir()?;
+    let main_module = resolve_path("./main.ts", &cwd)?;
+
+    let worker = MainWorker::bootstrap_from_options(
+        main_module.clone(),
+        permissions,
+        WorkerOptions {
+            module_loader: module_loader.clone(),
+            extensions: vec![deno_lib::init_ops_and_esm()], // add your custom extensions
+            startup_snapshot: Some(deno_isolate_init()),
+            ..WorkerOptions::default()
+        },
+    );
+    Ok(worker)
+}
+
+async fn run_script() -> anyhow::Result<()> {
+    let mut worker = make_main_worker().await?;
+    let script = r#"import("./local/side.ts").then(async ({main}) => {
+        const result = await main();
+        return result;
+    })
+    "#;
+    let global = worker.execute_script("<script_name>", script.to_owned().into())?;
+    let global = worker.js_runtime.resolve_value(global).await?;
+    let mut scope = worker.js_runtime.handle_scope();
+    let local_var = deno_core::v8::Local::new(&mut scope, global);
+    let val = serde_v8::from_v8::<serde_json::Value>(&mut scope, local_var)
+        .expect("Unable to deserialize");
+    println!("value: {:?}", val);
+    Ok(())
+}
 ```
 
-PowerShell (Windows):
+### bootstrap.js
 
-```powershell
-irm https://deno.land/install.ps1 | iex
+```js
+function hello(val) {
+  return Deno[Deno.internal].core.ops.op_hello(val);
+}
+globalThis.deno_lib = { hello };
 ```
 
-[Homebrew](https://formulae.brew.sh/formula/deno) (Mac):
+### dependencies
 
-```sh
-brew install deno
+```toml
+[dependencies]
+anyhow = "1.0.57"
+deno_core = { version = "0.195.0" }
+deno_lib =  { version = "1.35.0", git = 'https://github.com/sthamman2024/deno_lib.git', branch="lib" }
+futures = "0.3.28"
+log = "=0.4.17"
+serde = { version = "1.0.149", features = ["derive"] }
+serde_json = "1.0.85"
+tokio = { version = "1.28.1", features = ["full"] }
 ```
-
-[Chocolatey](https://chocolatey.org/packages/deno) (Windows):
-
-```powershell
-choco install deno
-```
-
-[Scoop](https://scoop.sh/) (Windows):
-
-```powershell
-scoop install deno
-```
-
-Build and install from source using [Cargo](https://crates.io/crates/deno):
-
-```sh
-cargo install deno --locked
-```
-
-See
-[deno_install](https://github.com/denoland/deno_install/blob/master/README.md)
-and [releases](https://github.com/denoland/deno/releases) for other options.
-
-### Getting Started
-
-Try [running a simple program](https://examples.deno.land/hello-world):
-
-```sh
-deno run https://deno.land/std/examples/welcome.ts
-```
-
-Or [setup a simple HTTP server](https://examples.deno.land/http-server):
-
-```ts
-import { serve } from "https://deno.land/std@0.182.0/http/server.ts";
-
-serve((_req) => new Response("Hello, World!"));
-```
-
-[More examples](https://examples.deno.land/).
-
-### Additional Resources
-
-- **[The Deno Manual](https://deno.land/manual)** is a great starting point for
-  [additional examples](https://deno.land/manual/examples),
-  [setting up your environment](https://deno.land/manual/getting_started/setup_your_environment),
-  [using npm](https://deno.land/manual/node), and more.
-- **[Runtime API reference](https://deno.land/api)** documents all APIs built
-  into Deno CLI.
-- **[Deno Standard Modules](https://deno.land/std)** do not have external
-  dependencies and are reviewed by the Deno core team.
-- **[deno.land/x](https://deno.land/x)** is the registry for third party
-  modules.
-- **[Blog](https://deno.com/blog)** is where the Deno team shares important
-  product updates and "how to"s, about solving technical problems.
-
-### Contributing
-
-We appreciate your help!
-
-To contribute, please read our
-[contributing instructions](https://deno.land/manual/contributing).
-
-[Build Status - Cirrus]: https://github.com/denoland/deno/workflows/ci/badge.svg?branch=main&event=push
-[Build status]: https://github.com/denoland/deno/actions
-[Twitter badge]: https://img.shields.io/twitter/follow/deno_land.svg?style=social&label=Follow
-[Twitter link]: https://twitter.com/intent/follow?screen_name=deno_land
-[YouTube badge]: https://img.shields.io/youtube/channel/subscribers/UCqC2G2M-rg4fzg1esKFLFIw?style=social
-[YouTube link]: https://www.youtube.com/@deno_land
-[Discord badge]: https://img.shields.io/discord/684898665143206084?logo=discord&style=social
-[Discord link]: https://discord.gg/deno

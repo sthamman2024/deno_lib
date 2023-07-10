@@ -492,6 +492,16 @@ impl CliMainWorkerFactory {
       shared: shared.clone(),
     })
   }
+
+  pub fn create_module_loader(
+    &self,
+    permissions: PermissionsContainer,
+  ) -> Rc<dyn ModuleLoader> {
+    self
+      .shared
+      .module_loader_factory
+      .create_for_main(PermissionsContainer::allow_all(), permissions)
+  }
 }
 
 // TODO(bartlomieju): this callback could have default value
