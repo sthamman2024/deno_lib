@@ -149,7 +149,7 @@ export async function main() {
 [dependencies]
 anyhow = "1.0.57"
 deno_core = { version = "0.194.0" }
-deno_lib =  { version = "1.35.0", git = 'https://github.com/sthamman2024/deno_lib.git', branch="lib.1.35.0" }
+deno_lib =  { version = "1.35.0", git = 'https://github.com/sthamman2024/deno_lib.git', tag="v1.35.0.lib" }
 futures = "0.3.28"
 log = "=0.4.17"
 serde = { version = "1.0.149", features = ["derive"] }
