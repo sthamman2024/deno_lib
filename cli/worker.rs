@@ -552,16 +552,19 @@ impl CliMainWorkerFactory {
         }
       }
     }
-  pub fn create_module_loader(
-    &self,
-    permissions: PermissionsContainer,
-  ) -> Rc<dyn ModuleLoader> {
-    self
-      .shared
-      .module_loader_factory
-      .create_for_main(PermissionsContainer::allow_all(), permissions)
-  }
 }
+
+// START create_module_loader
+pub fn create_module_loader(
+  &self,
+  permissions: PermissionsContainer,
+) -> Rc<dyn ModuleLoader> {
+  self
+    .shared
+    .module_loader_factory
+    .create_for_main(PermissionsContainer::allow_all(), permissions)
+}
+// END create_module_loader
 
 // TODO(bartlomieju): this callback could have default value
 // and not be required
