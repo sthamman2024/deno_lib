@@ -1158,7 +1158,7 @@ dependencies = [
 
 [[package]]
 name = "deno_lib"
-version = "1.36.2"
+version = "1.36.3"
 dependencies = [
  "async-trait",
  "atty",
