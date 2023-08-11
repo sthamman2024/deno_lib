@@ -530,15 +530,50 @@ impl CliMainWorkerFactory {
         }
       }
     }
-  pub fn create_module_loader(
-    &self,
-    permissions: PermissionsContainer,
-  ) -> Rc<dyn ModuleLoader> {
-    self
-      .shared
-      .module_loader_factory
-      .create_for_main(PermissionsContainer::allow_all(), permissions)
-  }
+}
+
+// START create_module_loader
+pub fn create_module_loader(
+  &self,
+  permissions: PermissionsContainer,
+) -> Rc<dyn ModuleLoader> {
+  self
+    .shared
+    .module_loader_factory
+    .create_for_main(PermissionsContainer::allow_all(), permissions)
+}
+// END create_module_loader
+
+// TODO(bartlomieju): this callback could have default value
+// and not be required
+fn create_web_worker_preload_module_callback(
+  _shared: &Arc<SharedWorkerState>,
+) -> Arc<WorkerEventCb> {
+  Arc::new(move |worker| {
+    let fut = async move { Ok(worker) };
+    LocalFutureObj::new(Box::new(fut))
+  })
+}
+
+fn create_web_worker_pre_execute_module_callback(
+  shared: Arc<SharedWorkerState>,
+) -> Arc<WorkerEventCb> {
+  Arc::new(move |mut worker| {
+    let shared = shared.clone();
+    let fut = async move {
+      // this will be up to date after pre-load
+      if shared.should_initialize_node_runtime() {
+        deno_node::initialize_runtime(
+          &mut worker.js_runtime,
+          shared.options.has_node_modules_dir,
+          None,
+        )?;
+      }
+
+      Ok(worker)
+    };
+    LocalFutureObj::new(Box::new(fut))
+  })
 }
 
 fn create_web_worker_callback(
