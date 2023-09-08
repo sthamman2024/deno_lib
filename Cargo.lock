@@ -1234,7 +1234,7 @@ dependencies = [
 
 [[package]]
 name = "deno_lib"
-version = "1.36.41"
+version = "1.36.42"
 dependencies = [
  "async-trait",
  "base32",
@@ -1256,8 +1256,8 @@ dependencies = [
  "deno_emit",
  "deno_graph",
  "deno_lint",
- "deno_lockfile 0.15.0",
- "deno_npm 0.12.0",
+ "deno_lockfile",
+ "deno_npm",
  "deno_runtime",
  "deno_semver",
  "deno_task_shell",
@@ -1356,18 +1356,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "deno_lockfile"
-version = "0.16.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1038f33740cd29127efa0f7858a869cef5df6baed7fd97c1c0db19213b11f5ef"
-dependencies = [
- "ring",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
 name = "deno_media_type"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1420,7 +1408,7 @@ dependencies = [
  "deno_fetch",
  "deno_fs",
  "deno_media_type",
- "deno_npm 0.12.0",
+ "deno_npm",
  "deno_semver",
  "digest 0.10.7",
  "dsa",
@@ -1474,24 +1462,7 @@ checksum = "c90198ae433bf22ac9b39fe5e18748d9d5b36db042ef1c24637f43d3b5e101e0"
 dependencies = [
  "anyhow",
  "async-trait",
- "deno_lockfile 0.15.0",
- "deno_semver",
- "futures",
- "log",
- "monch",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "deno_npm"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f4f1ce6bc2738c0068f205cef30b33d46103f65a26031affcd8c3994db0ca51"
-dependencies = [
- "anyhow",
- "async-trait",
- "deno_lockfile 0.16.2",
+ "deno_lockfile",
  "deno_semver",
  "futures",
  "log",
@@ -2123,15 +2094,15 @@ dependencies = [
 
 [[package]]
 name = "eszip"
-version = "0.50.1"
+version = "0.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96c51f197ceba98354cd4bf2db99db68c082e531685c634cea3453fbbcb071ba"
+checksum = "e254fcba0a6481f44fa41f41cb9027d811072e7e7fa94780ade4a7fa43b34c4b"
 dependencies = [
  "anyhow",
  "base64 0.21.2",
  "deno_ast",
  "deno_graph",
- "deno_npm 0.13.0",
+ "deno_npm",
  "deno_semver",
  "futures",
  "hashlink",
