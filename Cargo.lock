@@ -1234,7 +1234,7 @@ dependencies = [
 
 [[package]]
 name = "deno_lib"
-version = "1.36.42"
+version = "1.36.5"
 dependencies = [
  "async-trait",
  "base32",

@@ -542,6 +542,10 @@ impl CliMainWorkerFactory {
       .module_loader_factory
       .create_for_main(PermissionsContainer::allow_all(), permissions)
   }
+
+  pub fn get_shared_worker_state(&self) -> Arc<SharedWorkerState> {
+    self.shared.clone()
+  }
   // END create_module_loader
 }
 
